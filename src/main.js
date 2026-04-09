@@ -105,13 +105,20 @@ generateBtn.addEventListener("click", async () => {
     const audioData = await decodeAudioFile(audioFile);
 
     // Step 3: Transcribe
-    progressText.textContent = "Transcribing audio (this may take a moment)...";
-    progressBar.style.width = "70%";
+    const audioDurationSec = Math.round(audioData.length / 16000);
+    progressText.textContent = `Transcribing ${audioDurationSec}s of audio...`;
+    progressBar.style.width = "60%";
+    progressBar.classList.add("animate-pulse");
 
-    const result = await transcribeAudio(audioData, (percent) => {
-      progressBar.style.width = `${70 + percent * 0.2}%`;
-      progressText.textContent = `Transcribing audio... ${percent}%`;
-    });
+    const transcribeStart = Date.now();
+    const timerInterval = setInterval(() => {
+      const elapsed = Math.round((Date.now() - transcribeStart) / 1000);
+      progressText.textContent = `Transcribing audio... ${elapsed}s elapsed`;
+    }, 1000);
+
+    const result = await transcribeAudio(audioData);
+    clearInterval(timerInterval);
+    progressBar.classList.remove("animate-pulse");
     console.log("Whisper result:", JSON.stringify(result, null, 2));
 
     // Step 4: Align
