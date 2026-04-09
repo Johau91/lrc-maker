@@ -7,8 +7,9 @@ export async function loadWhisperModel(onProgress) {
 
   transcriber = await pipeline(
     "automatic-speech-recognition",
-    "Xenova/whisper-base",
+    "onnx-community/whisper-base",
     {
+      dtype: "fp32",
       device: "wasm",
       progress_callback: (progress) => {
         if (onProgress && progress.status === "progress") {
