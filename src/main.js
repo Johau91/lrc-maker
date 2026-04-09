@@ -116,7 +116,7 @@ generateBtn.addEventListener("click", async () => {
       progressText.textContent = `Transcribing audio... ${elapsed}s elapsed`;
     }, 1000);
 
-    const result = await transcribeAudio(audioData);
+    const result = await transcribeAudio(audioData, lyrics);
     clearInterval(timerInterval);
     progressBar.classList.remove("animate-pulse");
     console.log("Whisper result:", JSON.stringify(result, null, 2));
