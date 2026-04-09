@@ -1,5 +1,5 @@
 import "./style.css";
-import { loadWhisperModel, transcribeAudio } from "./whisper.js";
+import { loadCTCModel } from "./ctc-model.js";
 import { isolateVocals, decodeAudioFile } from "./vocal-filter.js";
 import { alignLyrics } from "./aligner.js";
 import { generateLRC, downloadLRC, formatTimestamp } from "./lrc.js";
@@ -91,56 +91,47 @@ generateBtn.addEventListener("click", async () => {
     resultSection.classList.add("hidden");
 
     // Step 1: Load model
-    progressStep.textContent = "Step 1/4 — Loading AI model";
-    progressText.textContent = "First time may take a while (~500MB)";
+    progressStep.textContent = "Step 1/3 — Loading AI model";
+    progressText.textContent = "First time downloads ~95MB (cached after)";
     progressBar.style.width = "0%";
 
-    await loadWhisperModel((p) => {
-      progressBar.style.width = `${Math.min(p.percent * 0.35, 35)}%`;
+    await loadCTCModel((p) => {
+      progressBar.style.width = `${Math.min(p.percent * 0.4, 40)}%`;
       const mb = (p.loaded / 1024 / 1024).toFixed(0);
       const totalMb = (p.total / 1024 / 1024).toFixed(0);
       progressText.textContent = `Downloading... ${mb}MB / ${totalMb}MB`;
     });
 
-    // Step 2: Isolate vocals
-    progressStep.textContent = "Step 2/4 — Isolating vocals";
-    progressText.textContent = "Filtering out instruments...";
-    progressBar.style.width = "40%";
+    // Step 2: Process audio
+    progressStep.textContent = "Step 2/3 — Analyzing vocals";
+    progressBar.style.width = "50%";
 
-    const rawAudioData = await decodeAudioFile(audioFile);
-    let vocalAudioData;
+    let audioData;
     try {
-      vocalAudioData = await isolateVocals(audioFile);
+      audioData = await isolateVocals(audioFile);
+      progressText.textContent = "Vocal isolation complete. Detecting speech...";
     } catch (e) {
       console.warn("Vocal isolation failed, using raw audio:", e);
-      vocalAudioData = rawAudioData;
+      audioData = await decodeAudioFile(audioFile);
     }
 
-    // Step 3: Transcribe
-    const audioDurationSec = Math.round(rawAudioData.length / 16000);
-    progressStep.textContent = "Step 3/4 — Analyzing vocals";
-    progressText.textContent = `Processing ${audioDurationSec}s of audio...`;
-    progressBar.style.width = "55%";
+    const audioDurationSec = Math.round(audioData.length / 16000);
+    progressText.textContent = `Analyzing ${audioDurationSec}s of audio...`;
     progressBar.classList.add("animate-pulse");
 
-    const transcribeStart = Date.now();
+    const analyzeStart = Date.now();
     const timerInterval = setInterval(() => {
-      const elapsed = Math.round((Date.now() - transcribeStart) / 1000);
-      progressText.textContent = `Analyzing... ${elapsed}s elapsed`;
+      const elapsed = Math.round((Date.now() - analyzeStart) / 1000);
+      progressText.textContent = `Detecting vocal segments... ${elapsed}s`;
     }, 1000);
 
-    const language = languageSelect.value === "auto" ? null : languageSelect.value;
-    const result = await transcribeAudio(vocalAudioData, lyrics, language);
+    // Step 3: Align
+    progressStep.textContent = "Step 3/3 — Syncing lyrics";
+
+    const audioDuration = audioData.length / 16000;
+    alignedLines = await alignLyrics(audioData, lyrics, audioDuration);
     clearInterval(timerInterval);
     progressBar.classList.remove("animate-pulse");
-    console.log("Whisper result:", JSON.stringify(result, null, 2));
-
-    // Step 4: Align
-    progressStep.textContent = "Step 4/4 — Syncing lyrics";
-    progressBar.style.width = "90%";
-
-    const audioDuration = rawAudioData.length / 16000;
-    alignedLines = alignLyrics(result, lyrics, audioDuration, rawAudioData);
 
     // Step 5: Show results
     progressBar.style.width = "100%";
