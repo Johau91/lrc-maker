@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LRC Maker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+</head>
+<body class="min-h-screen bg-bg">
+  <div class="max-w-2xl mx-auto px-4 py-8">
+
+    <!-- Header -->
+    <header class="text-center mb-8">
+      <h1 class="text-3xl font-bold text-text tracking-tight">LRC Maker</h1>
+      <p class="text-text-dim text-sm mt-1">Upload a song + paste lyrics = synced LRC file</p>
+    </header>
+
+    <!-- Input Section -->
+    <div id="input-section" class="space-y-5">
+
+      <!-- Audio Upload -->
+      <div id="drop-zone" class="drop-zone rounded-xl p-8 text-center cursor-pointer bg-surface hover:bg-surface-hover">
+        <svg class="mx-auto mb-3 w-10 h-10 text-text-dim" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2z"/>
+        </svg>
+        <p class="text-text-dim text-sm">Drop audio file here or click to select</p>
+        <p class="text-text-dim text-xs mt-1">MP3, WAV, M4A, OGG, FLAC</p>
+        <input id="file-input" type="file" accept="audio/*" class="hidden" />
+        <p id="file-name" class="hidden mt-2 text-accent text-sm font-medium"></p>
+      </div>
+
+      <!-- Lyrics -->
+      <div>
+        <textarea
+          id="lyrics-input"
+          rows="10"
+          class="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-text placeholder-text-dim focus:border-accent focus:outline-none resize-y"
+          placeholder="Paste lyrics here (one line per row)..."
+        ></textarea>
+      </div>
+
+      <!-- Metadata -->
+      <div class="flex gap-3">
+        <input
+          id="title-input"
+          type="text"
+          placeholder="Song title"
+          class="flex-1 bg-surface border border-border rounded-lg px-3 py-2 text-sm text-text placeholder-text-dim focus:border-accent focus:outline-none"
+        />
+        <input
+          id="artist-input"
+          type="text"
+          placeholder="Artist"
+          class="flex-1 bg-surface border border-border rounded-lg px-3 py-2 text-sm text-text placeholder-text-dim focus:border-accent focus:outline-none"
+        />
+      </div>
+
+      <!-- Generate Button -->
+      <button
+        id="generate-btn"
+        class="btn w-full bg-accent hover:bg-accent-hover text-white font-semibold rounded-xl py-3 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        Generate LRC
+      </button>
+    </div>
+
+    <!-- Progress Section -->
+    <div id="progress-section" class="hidden mt-6">
+      <div class="bg-surface rounded-xl p-5">
+        <div class="w-full bg-border rounded-full h-2 mb-3 overflow-hidden">
+          <div id="progress-bar" class="progress-bar h-full bg-accent rounded-full" style="width: 0%"></div>
+        </div>
+        <p id="progress-text" class="text-text-dim text-sm text-center"></p>
+      </div>
+    </div>
+
+    <!-- Result Section -->
+    <div id="result-section" class="hidden mt-6 space-y-4">
+
+      <!-- Waveform Player -->
+      <div class="bg-surface rounded-xl p-4">
+        <div id="waveform" class="mb-3"></div>
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <button id="play-btn" class="btn bg-accent hover:bg-accent-hover text-white text-sm font-medium px-4 py-1.5 rounded-lg">
+              Play
+            </button>
+            <span class="text-xs font-mono text-text-dim">
+              <span id="current-time">00:00.00</span> / <span id="duration">00:00.00</span>
+            </span>
+          </div>
+          <button id="capture-btn" class="btn bg-surface-hover hover:bg-border text-warn text-xs font-medium px-3 py-1.5 rounded-lg border border-border">
+            Capture timestamp
+          </button>
+        </div>
+      </div>
+
+      <!-- Aligned Lyrics -->
+      <div class="bg-surface rounded-xl p-4">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-sm font-semibold text-text">Synced Lyrics</h2>
+          <p class="text-xs text-text-dim">Click a line to jump. Use buttons to fine-tune.</p>
+        </div>
+        <div id="lines-container" class="max-h-80 overflow-y-auto space-y-0.5"></div>
+      </div>
+
+      <!-- Download -->
+      <button
+        id="download-btn"
+        class="btn w-full bg-active hover:opacity-90 text-white font-semibold rounded-xl py-3 text-sm"
+      >
+        Download LRC
+      </button>
+    </div>
+
+    <!-- Footer -->
+    <footer class="text-center mt-10 text-text-dim text-xs">
+      <p>All processing runs locally in your browser. No audio data is sent to any server.</p>
+    </footer>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

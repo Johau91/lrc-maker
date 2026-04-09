@@ -1,0 +1,18 @@
+{
+  "name": "lrc-maker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "^4.0.1",
+    "@tailwindcss/vite": "^4.2.2",
+    "tailwindcss": "^4.2.2",
+    "vite": "^8.0.8",
+    "wavesurfer.js": "^7.12.5"
+  }
+}

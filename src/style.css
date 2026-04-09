@@ -1,0 +1,61 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #0f0f14;
+  --color-surface: #1a1a24;
+  --color-surface-hover: #22222f;
+  --color-border: #2a2a3a;
+  --color-text: #e2e8f0;
+  --color-text-dim: #64748b;
+  --color-accent: #6366f1;
+  --color-accent-hover: #818cf8;
+  --color-active: #22c55e;
+  --color-warn: #f59e0b;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+}
+
+.drop-zone {
+  border: 2px dashed var(--color-border);
+  transition: all 0.2s;
+}
+
+.drop-zone.drag-over {
+  border-color: var(--color-accent);
+  background: color-mix(in oklch, var(--color-accent) 8%, transparent);
+}
+
+.lyrics-line {
+  transition: background 0.15s;
+  cursor: pointer;
+}
+
+.lyrics-line:hover {
+  background: var(--color-surface-hover);
+}
+
+.lyrics-line.active {
+  background: color-mix(in oklch, var(--color-accent) 15%, transparent);
+  border-left: 3px solid var(--color-accent);
+}
+
+.progress-bar {
+  transition: width 0.3s ease;
+}
+
+.btn {
+  transition: all 0.15s;
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+}
