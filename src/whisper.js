@@ -7,10 +7,8 @@ export async function loadWhisperModel(onProgress) {
 
   transcriber = await pipeline(
     "automatic-speech-recognition",
-    "onnx-community/whisper-base",
+    "Xenova/whisper-base",
     {
-      dtype: "q4",
-      device: "webgpu",
       progress_callback: (progress) => {
         if (onProgress && progress.status === "progress") {
           onProgress({
@@ -33,7 +31,7 @@ export async function transcribeAudio(audioData, onProgress) {
   }
 
   const result = await transcriber(audioData, {
-    return_timestamps: "word",
+    return_timestamps: true,
     chunk_length_s: 30,
     stride_length_s: 5,
     language: null,
