@@ -1,5 +1,6 @@
 import "./style.css";
-import { loadWhisperModel, transcribeAudio, decodeAudioFile } from "./whisper.js";
+import { loadWhisperModel, transcribeAudio } from "./whisper.js";
+import { isolateVocals, decodeAudioFile } from "./vocal-filter.js";
 import { alignLyrics } from "./aligner.js";
 import { generateLRC, downloadLRC, formatTimestamp } from "./lrc.js";
 import { initPlayer, playPause, seekTo, getCurrentTime, isPlaying, onTimeUpdate } from "./player.js";
@@ -99,14 +100,22 @@ generateBtn.addEventListener("click", async () => {
       progressText.textContent = `Downloading model... ${mb}MB / ${totalMb}MB`;
     });
 
-    // Step 2: Decode audio
-    progressText.textContent = "Decoding audio...";
-    progressBar.style.width = "50%";
+    // Step 2: Isolate vocals (bandpass filter)
+    progressText.textContent = "Isolating vocals...";
+    progressBar.style.width = "40%";
 
-    const audioData = await decodeAudioFile(audioFile);
+    const rawAudioData = await decodeAudioFile(audioFile);
+    let vocalAudioData;
+    try {
+      vocalAudioData = await isolateVocals(audioFile);
+      console.log("Vocal isolation complete");
+    } catch (e) {
+      console.warn("Vocal isolation failed, using raw audio:", e);
+      vocalAudioData = rawAudioData;
+    }
 
-    // Step 3: Transcribe
-    const audioDurationSec = Math.round(audioData.length / 16000);
+    // Step 3: Transcribe isolated vocals
+    const audioDurationSec = Math.round(rawAudioData.length / 16000);
     progressText.textContent = `Transcribing ${audioDurationSec}s of audio...`;
     progressBar.style.width = "60%";
     progressBar.classList.add("animate-pulse");
@@ -118,7 +127,7 @@ generateBtn.addEventListener("click", async () => {
     }, 1000);
 
     const language = languageSelect.value === "auto" ? null : languageSelect.value;
-    const result = await transcribeAudio(audioData, lyrics, language);
+    const result = await transcribeAudio(vocalAudioData, lyrics, language);
     clearInterval(timerInterval);
     progressBar.classList.remove("animate-pulse");
     console.log("Whisper result:", JSON.stringify(result, null, 2));
@@ -127,8 +136,8 @@ generateBtn.addEventListener("click", async () => {
     progressText.textContent = "Aligning lyrics...";
     progressBar.style.width = "90%";
 
-    const audioDuration = audioData.length / 16000;
-    alignedLines = alignLyrics(result, lyrics, audioDuration, audioData);
+    const audioDuration = rawAudioData.length / 16000;
+    alignedLines = alignLyrics(result, lyrics, audioDuration, rawAudioData);
 
     // Step 5: Show results
     progressBar.style.width = "100%";

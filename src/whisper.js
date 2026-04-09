@@ -7,7 +7,7 @@ export async function loadWhisperModel(onProgress) {
 
   transcriber = await pipeline(
     "automatic-speech-recognition",
-    "onnx-community/whisper-base",
+    "onnx-community/whisper-small",
     {
       dtype: "fp32",
       device: "wasm",
@@ -46,13 +46,4 @@ export async function transcribeAudio(audioData, lyrics = "", language = null) {
   return result;
 }
 
-export async function decodeAudioFile(file) {
-  const audioContext = new AudioContext({ sampleRate: 16000 });
-  const arrayBuffer = await file.arrayBuffer();
-  const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-
-  const channelData = audioBuffer.getChannelData(0);
-  await audioContext.close();
-
-  return channelData;
-}
+// decodeAudioFile moved to vocal-filter.js
