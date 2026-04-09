@@ -6,24 +6,40 @@ function normalize(text) {
     .trim();
 }
 
-function countWords(text) {
-  return normalize(text).split(/\s+/).filter(Boolean).length;
+function similarity(a, b) {
+  const na = normalize(a);
+  const nb = normalize(b);
+  if (na === nb) return 1;
+  if (!na || !nb) return 0;
+
+  // Character-level overlap for Korean (word splitting is unreliable)
+  const setA = new Set(na.replace(/\s/g, "").split(""));
+  const setB = new Set(nb.replace(/\s/g, "").split(""));
+  let overlap = 0;
+  for (const ch of setA) {
+    if (setB.has(ch)) overlap++;
+  }
+  return overlap / Math.max(setA.size, setB.size);
 }
 
 export function alignLyrics(whisperResult, lyricsText, audioDuration = 0) {
   const chunks = whisperResult.chunks || [];
 
+  // Use the user's original line breaks
+  const lines = lyricsText
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
+
   if (chunks.length === 0) {
-    const lines = lyricsText.split("\n").map((l) => l.trim()).filter(Boolean);
     return distributeEvenly(lines, audioDuration);
   }
 
-  // Whisper segments with timestamps
+  // Build a flat timeline of whisper text with timestamps
   const segments = chunks.map((c) => ({
     text: c.text.trim(),
     start: c.timestamp?.[0] ?? 0,
     end: c.timestamp?.[1] ?? 0,
-    wordCount: countWords(c.text),
   }));
 
   const totalDuration = Math.max(
@@ -31,65 +47,59 @@ export function alignLyrics(whisperResult, lyricsText, audioDuration = 0) {
     ...segments.map((s) => s.end),
   );
 
-  // Flatten user lyrics into words
-  const allWords = lyricsText
-    .replace(/\n/g, " ")
-    .split(/\s+/)
-    .filter(Boolean);
-
-  const totalUserWords = allWords.length;
-  const totalWhisperWords = segments.reduce((sum, s) => sum + s.wordCount, 0);
-
-  if (totalWhisperWords === 0 || totalUserWords === 0) {
-    const lines = lyricsText.split("\n").map((l) => l.trim()).filter(Boolean);
-    return distributeEvenly(lines, totalDuration);
+  // Concatenate all whisper text, tracking character positions → timestamps
+  const charTimeline = [];
+  for (const seg of segments) {
+    const chars = seg.text.split("");
+    for (let i = 0; i < chars.length; i++) {
+      const t = seg.start + ((seg.end - seg.start) * i) / Math.max(chars.length, 1);
+      charTimeline.push({ char: chars[i], time: t });
+    }
+    // Add space between segments
+    charTimeline.push({ char: " ", time: seg.end });
   }
 
-  // Distribute user lyrics words across segments proportionally
+  // Full whisper text (normalized)
+  const whisperFull = normalize(
+    segments.map((s) => s.text).join(" "),
+  );
+
+  // Flatten user lyrics into one normalized string
+  const userFull = normalize(lines.join(" "));
+
+  // Map each user line to a position in the whisper text proportionally
   const aligned = [];
-  let wordIdx = 0;
+  let userCharPos = 0;
 
-  for (let i = 0; i < segments.length; i++) {
-    const seg = segments[i];
-    // How many user words correspond to this segment
-    const ratio = seg.wordCount / totalWhisperWords;
-    let wordsForSegment = Math.round(ratio * totalUserWords);
-
-    // Last segment gets remaining words
-    if (i === segments.length - 1) {
-      wordsForSegment = totalUserWords - wordIdx;
+  for (const line of lines) {
+    const normalizedLine = normalize(line);
+    if (!normalizedLine) {
+      aligned.push({ text: line, start: 0, end: 0, matched: false });
+      continue;
     }
 
-    // Ensure at least 1 word if words remain
-    if (wordsForSegment <= 0 && wordIdx < totalUserWords) {
-      wordsForSegment = 1;
-    }
+    // This line's proportion in the total user text
+    const lineStartRatio = userCharPos / Math.max(userFull.length, 1);
+    const lineEndRatio = (userCharPos + normalizedLine.length) / Math.max(userFull.length, 1);
 
-    if (wordsForSegment > 0 && wordIdx < totalUserWords) {
-      const lineWords = allWords.slice(wordIdx, wordIdx + wordsForSegment);
-      aligned.push({
-        text: lineWords.join(" "),
-        start: seg.start,
-        end: seg.end,
-        matched: true,
-      });
-      wordIdx += wordsForSegment;
-    }
-  }
+    // Map to whisper character timeline
+    const timelineStart = Math.floor(lineStartRatio * charTimeline.length);
+    const timelineEnd = Math.floor(lineEndRatio * charTimeline.length);
 
-  // If there are leftover words (more user words than whisper detected)
-  if (wordIdx < totalUserWords) {
-    const remaining = allWords.slice(wordIdx).join(" ");
-    const lastEnd = segments[segments.length - 1]?.end ?? totalDuration;
+    const startTime = charTimeline[Math.min(timelineStart, charTimeline.length - 1)]?.time ?? 0;
+    const endTime = charTimeline[Math.min(timelineEnd, charTimeline.length - 1)]?.time ?? startTime + 2;
+
     aligned.push({
-      text: remaining,
-      start: lastEnd,
-      end: totalDuration,
-      matched: false,
+      text: line,
+      start: parseFloat(startTime.toFixed(2)),
+      end: parseFloat(endTime.toFixed(2)),
+      matched: true,
     });
+
+    userCharPos += normalizedLine.length + 1; // +1 for space between lines
   }
 
-  console.log(`Aligned ${aligned.length} lines from ${segments.length} segments`);
+  console.log(`Aligned ${aligned.length} lines across ${totalDuration.toFixed(1)}s`);
   return aligned;
 }
 
