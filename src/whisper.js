@@ -32,12 +32,22 @@ export async function transcribeAudio(audioData, onProgress) {
     throw new Error("Whisper model not loaded. Call loadWhisperModel first.");
   }
 
+  const durationSec = audioData.length / 16000;
+
   const result = await transcriber(audioData, {
     return_timestamps: true,
     chunk_length_s: 30,
     stride_length_s: 5,
     language: null,
     task: "transcribe",
+    callback_function: (output) => {
+      if (onProgress && output?.chunks?.length) {
+        const lastChunk = output.chunks[output.chunks.length - 1];
+        const processedTime = lastChunk.timestamp?.[1] ?? 0;
+        const percent = Math.min(Math.round((processedTime / durationSec) * 100), 99);
+        onProgress(percent);
+      }
+    },
   });
 
   return result;

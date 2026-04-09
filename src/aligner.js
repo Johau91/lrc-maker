@@ -21,28 +21,32 @@ function similarity(a, b) {
   return matches / Math.max(wordsA.length, wordsB.length);
 }
 
-export function alignLyrics(whisperResult, lyricsText) {
+export function alignLyrics(whisperResult, lyricsText, audioDuration = 0) {
   const chunks = whisperResult.chunks || [];
   const lines = lyricsText
     .split("\n")
     .map((l) => l.trim())
     .filter((l) => l.length > 0);
 
+  // If no chunks at all, distribute evenly across audio duration
   if (chunks.length === 0) {
-    return lines.map((text) => ({
-      text,
-      start: 0,
-      end: 0,
-      matched: false,
-    }));
+    return distributeEvenly(lines, audioDuration);
   }
 
-  // Whisper chunks are sentence-level: [{ text, timestamp: [start, end] }]
+  // Get total duration from chunks
+  const totalDuration = Math.max(
+    audioDuration,
+    ...chunks.map((c) => c.timestamp?.[1] ?? 0),
+  );
+
+  // Whisper chunks: [{ text, timestamp: [start, end] }]
   const segments = chunks.map((c) => ({
     text: c.text.trim(),
     start: c.timestamp?.[0] ?? 0,
     end: c.timestamp?.[1] ?? 0,
   }));
+
+  console.log("Segments:", segments);
 
   let segIndex = 0;
   const aligned = [];
@@ -60,23 +64,22 @@ export function alignLyrics(whisperResult, lyricsText) {
 
     const searchEnd = Math.min(segIndex + 20, segments.length);
     for (let i = segIndex; i < searchEnd; i++) {
+      // Match against single segment
       const score = similarity(normalizedLine, segments[i].text);
       if (score > bestScore) {
         bestScore = score;
         bestIdx = i;
       }
-    }
 
-    // Also try combining consecutive segments (one line may span multiple chunks)
-    for (let i = segIndex; i < searchEnd; i++) {
-      for (let j = i; j < Math.min(i + 3, segments.length); j++) {
+      // Also try combining consecutive segments
+      for (let j = i + 1; j < Math.min(i + 3, segments.length); j++) {
         const combined = segments
           .slice(i, j + 1)
           .map((s) => s.text)
           .join(" ");
-        const score = similarity(normalizedLine, combined);
-        if (score > bestScore) {
-          bestScore = score;
+        const combinedScore = similarity(normalizedLine, combined);
+        if (combinedScore > bestScore) {
+          bestScore = combinedScore;
           bestIdx = i;
         }
       }
@@ -91,13 +94,37 @@ export function alignLyrics(whisperResult, lyricsText) {
       matched: bestScore > 0.15,
     });
 
-    // Advance segment pointer if we got a decent match
     if (bestScore > 0.15) {
       segIndex = bestIdx + 1;
     }
   }
 
+  // Check if alignment worked at all
+  const matchedCount = aligned.filter((a) => a.matched).length;
+  console.log(`Matched ${matchedCount}/${aligned.length} lines`);
+
+  // If no lines matched, fall back to even distribution
+  if (matchedCount === 0) {
+    return distributeEvenly(lines, totalDuration);
+  }
+
   // Interpolate unmatched lines between matched anchors
+  interpolateUnmatched(aligned, totalDuration);
+
+  return aligned;
+}
+
+function distributeEvenly(lines, duration) {
+  const gap = duration / (lines.length + 1);
+  return lines.map((text, i) => ({
+    text,
+    start: parseFloat((gap * (i + 1)).toFixed(2)),
+    end: parseFloat((gap * (i + 1) + gap * 0.8).toFixed(2)),
+    matched: false,
+  }));
+}
+
+function interpolateUnmatched(aligned, totalDuration) {
   for (let i = 0; i < aligned.length; i++) {
     if (aligned[i].matched) continue;
 
@@ -118,19 +145,15 @@ export function alignLyrics(whisperResult, lyricsText) {
 
     const prevTime = prevIdx >= 0 ? aligned[prevIdx].start : 0;
     const nextTime =
-      nextIdx >= 0
-        ? aligned[nextIdx].start
-        : segments[segments.length - 1]?.end ?? prevTime + 10;
-    const totalGap =
-      (nextIdx >= 0 ? nextIdx : aligned.length) -
-      (prevIdx >= 0 ? prevIdx : -1);
-    const position = i - (prevIdx >= 0 ? prevIdx : -1);
+      nextIdx >= 0 ? aligned[nextIdx].start : totalDuration;
+    const startPos = prevIdx >= 0 ? prevIdx : -1;
+    const endPos = nextIdx >= 0 ? nextIdx : aligned.length;
+    const totalGap = endPos - startPos;
+    const position = i - startPos;
 
     aligned[i].start = parseFloat(
       (prevTime + ((nextTime - prevTime) * position) / totalGap).toFixed(2),
     );
-    aligned[i].end = aligned[i].start + 2;
+    aligned[i].end = parseFloat((aligned[i].start + 2).toFixed(2));
   }
-
-  return aligned;
 }

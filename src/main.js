@@ -108,13 +108,18 @@ generateBtn.addEventListener("click", async () => {
     progressText.textContent = "Transcribing audio (this may take a moment)...";
     progressBar.style.width = "70%";
 
-    const result = await transcribeAudio(audioData);
+    const result = await transcribeAudio(audioData, (percent) => {
+      progressBar.style.width = `${70 + percent * 0.2}%`;
+      progressText.textContent = `Transcribing audio... ${percent}%`;
+    });
+    console.log("Whisper result:", JSON.stringify(result, null, 2));
 
     // Step 4: Align
     progressText.textContent = "Aligning lyrics...";
     progressBar.style.width = "90%";
 
-    alignedLines = alignLyrics(result, lyrics);
+    const audioDuration = audioData.length / 16000;
+    alignedLines = alignLyrics(result, lyrics, audioDuration);
 
     // Step 5: Show results
     progressBar.style.width = "100%";
