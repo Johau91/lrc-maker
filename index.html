@@ -81,10 +81,17 @@
     <!-- Progress Section -->
     <div id="progress-section" class="hidden mt-6">
       <div class="bg-surface rounded-xl p-5">
+        <div class="flex items-center justify-center gap-3 mb-4">
+          <div class="audio-wave">
+            <span></span><span></span><span></span><span></span><span></span>
+          </div>
+          <p id="progress-step" class="text-accent text-sm font-medium"></p>
+          <div class="spinner"></div>
+        </div>
         <div class="w-full bg-border rounded-full h-2 mb-3 overflow-hidden">
           <div id="progress-bar" class="progress-bar h-full bg-accent rounded-full" style="width: 0%"></div>
         </div>
-        <p id="progress-text" class="text-text-dim text-sm text-center"></p>
+        <p id="progress-text" class="text-text-dim text-xs text-center"></p>
       </div>
     </div>
 

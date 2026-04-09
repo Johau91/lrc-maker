@@ -18,6 +18,7 @@ const titleInput = document.getElementById("title-input");
 const artistInput = document.getElementById("artist-input");
 const generateBtn = document.getElementById("generate-btn");
 const progressSection = document.getElementById("progress-section");
+const progressStep = document.getElementById("progress-step");
 const progressBar = document.getElementById("progress-bar");
 const progressText = document.getElementById("progress-text");
 const resultSection = document.getElementById("result-section");
@@ -90,40 +91,42 @@ generateBtn.addEventListener("click", async () => {
     resultSection.classList.add("hidden");
 
     // Step 1: Load model
-    progressText.textContent = "Loading Whisper model (first time may take a while)...";
+    progressStep.textContent = "Step 1/4 — Loading AI model";
+    progressText.textContent = "First time may take a while (~500MB)";
     progressBar.style.width = "0%";
 
     await loadWhisperModel((p) => {
-      progressBar.style.width = `${Math.min(p.percent, 100)}%`;
+      progressBar.style.width = `${Math.min(p.percent * 0.35, 35)}%`;
       const mb = (p.loaded / 1024 / 1024).toFixed(0);
       const totalMb = (p.total / 1024 / 1024).toFixed(0);
-      progressText.textContent = `Downloading model... ${mb}MB / ${totalMb}MB`;
+      progressText.textContent = `Downloading... ${mb}MB / ${totalMb}MB`;
     });
 
-    // Step 2: Isolate vocals (bandpass filter)
-    progressText.textContent = "Isolating vocals...";
+    // Step 2: Isolate vocals
+    progressStep.textContent = "Step 2/4 — Isolating vocals";
+    progressText.textContent = "Filtering out instruments...";
     progressBar.style.width = "40%";
 
     const rawAudioData = await decodeAudioFile(audioFile);
     let vocalAudioData;
     try {
       vocalAudioData = await isolateVocals(audioFile);
-      console.log("Vocal isolation complete");
     } catch (e) {
       console.warn("Vocal isolation failed, using raw audio:", e);
       vocalAudioData = rawAudioData;
     }
 
-    // Step 3: Transcribe isolated vocals
+    // Step 3: Transcribe
     const audioDurationSec = Math.round(rawAudioData.length / 16000);
-    progressText.textContent = `Transcribing ${audioDurationSec}s of audio...`;
-    progressBar.style.width = "60%";
+    progressStep.textContent = "Step 3/4 — Analyzing vocals";
+    progressText.textContent = `Processing ${audioDurationSec}s of audio...`;
+    progressBar.style.width = "55%";
     progressBar.classList.add("animate-pulse");
 
     const transcribeStart = Date.now();
     const timerInterval = setInterval(() => {
       const elapsed = Math.round((Date.now() - transcribeStart) / 1000);
-      progressText.textContent = `Transcribing audio... ${elapsed}s elapsed`;
+      progressText.textContent = `Analyzing... ${elapsed}s elapsed`;
     }, 1000);
 
     const language = languageSelect.value === "auto" ? null : languageSelect.value;
@@ -133,7 +136,7 @@ generateBtn.addEventListener("click", async () => {
     console.log("Whisper result:", JSON.stringify(result, null, 2));
 
     // Step 4: Align
-    progressText.textContent = "Aligning lyrics...";
+    progressStep.textContent = "Step 4/4 — Syncing lyrics";
     progressBar.style.width = "90%";
 
     const audioDuration = rawAudioData.length / 16000;
