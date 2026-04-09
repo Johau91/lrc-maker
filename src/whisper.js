@@ -27,19 +27,18 @@ export async function loadWhisperModel(onProgress) {
   return transcriber;
 }
 
-export async function transcribeAudio(audioData, lyrics = "") {
+export async function transcribeAudio(audioData, lyrics = "", language = null) {
   if (!transcriber) {
     throw new Error("Whisper model not loaded. Call loadWhisperModel first.");
   }
 
-  // Pass first ~200 chars of lyrics as prompt to help Whisper recognize the words
   const prompt = lyrics.replace(/\n/g, " ").slice(0, 200).trim();
 
   const result = await transcriber(audioData, {
     return_timestamps: true,
     chunk_length_s: 30,
     stride_length_s: 5,
-    language: "korean",
+    language,
     task: "transcribe",
     ...(prompt ? { initial_prompt: prompt } : {}),
   });

@@ -28,6 +28,7 @@ const linesContainer = document.getElementById("lines-container");
 const captureBtn = document.getElementById("capture-btn");
 const downloadBtn = document.getElementById("download-btn");
 const inputSection = document.getElementById("input-section");
+const languageSelect = document.getElementById("language-select");
 
 // File drop handling
 dropZone.addEventListener("click", () => fileInput.click());
@@ -116,7 +117,8 @@ generateBtn.addEventListener("click", async () => {
       progressText.textContent = `Transcribing audio... ${elapsed}s elapsed`;
     }, 1000);
 
-    const result = await transcribeAudio(audioData, lyrics);
+    const language = languageSelect.value === "auto" ? null : languageSelect.value;
+    const result = await transcribeAudio(audioData, lyrics, language);
     clearInterval(timerInterval);
     progressBar.classList.remove("animate-pulse");
     console.log("Whisper result:", JSON.stringify(result, null, 2));
