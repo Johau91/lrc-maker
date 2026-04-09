@@ -128,7 +128,7 @@ generateBtn.addEventListener("click", async () => {
     progressBar.style.width = "90%";
 
     const audioDuration = audioData.length / 16000;
-    alignedLines = alignLyrics(result, lyrics, audioDuration);
+    alignedLines = alignLyrics(result, lyrics, audioDuration, audioData);
 
     // Step 5: Show results
     progressBar.style.width = "100%";

@@ -1,110 +1,80 @@
-function normalize(text) {
-  return text
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}\s]/gu, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
+import { detectOnsets, matchSegmentsToLines } from "./onset.js";
 
-function similarity(a, b) {
-  const na = normalize(a);
-  const nb = normalize(b);
-  if (na === nb) return 1;
-  if (!na || !nb) return 0;
-
-  // Character-level overlap for Korean (word splitting is unreliable)
-  const setA = new Set(na.replace(/\s/g, "").split(""));
-  const setB = new Set(nb.replace(/\s/g, "").split(""));
-  let overlap = 0;
-  for (const ch of setA) {
-    if (setB.has(ch)) overlap++;
-  }
-  return overlap / Math.max(setA.size, setB.size);
-}
-
-export function alignLyrics(whisperResult, lyricsText, audioDuration = 0) {
-  const chunks = whisperResult.chunks || [];
-
-  // Use the user's original line breaks
+export function alignLyrics(whisperResult, lyricsText, audioDuration = 0, audioData = null) {
   const lines = lyricsText
     .split("\n")
     .map((l) => l.trim())
     .filter((l) => l.length > 0);
 
-  if (chunks.length === 0) {
-    return distributeEvenly(lines, audioDuration);
+  if (lines.length === 0) return [];
+
+  // Primary: use audio energy onset detection
+  if (audioData) {
+    const segments = detectOnsets(audioData, 16000);
+    console.log(`Detected ${segments.length} vocal segments:`, segments);
+
+    const matched = matchSegmentsToLines(segments, lines.length);
+    console.log(`Matched to ${matched.length} lines:`, matched);
+
+    if (matched.length === lines.length) {
+      return lines.map((text, i) => ({
+        text,
+        start: parseFloat(matched[i].start.toFixed(2)),
+        end: parseFloat(matched[i].end.toFixed(2)),
+        matched: true,
+      }));
+    }
   }
 
-  // Build a flat timeline of whisper text with timestamps
-  const segments = chunks.map((c) => ({
-    text: c.text.trim(),
-    start: c.timestamp?.[0] ?? 0,
-    end: c.timestamp?.[1] ?? 0,
-  }));
+  // Fallback: use Whisper segments with proportional mapping
+  const chunks = whisperResult?.chunks || [];
 
-  const totalDuration = Math.max(
-    audioDuration,
-    ...segments.map((s) => s.end),
-  );
+  if (chunks.length > 0) {
+    const segments = chunks.map((c) => ({
+      text: c.text.trim(),
+      start: c.timestamp?.[0] ?? 0,
+      end: c.timestamp?.[1] ?? 0,
+    }));
 
-  // Concatenate all whisper text, tracking character positions → timestamps
-  const charTimeline = [];
-  for (const seg of segments) {
-    const chars = seg.text.split("");
-    for (let i = 0; i < chars.length; i++) {
-      const t = seg.start + ((seg.end - seg.start) * i) / Math.max(chars.length, 1);
-      charTimeline.push({ char: chars[i], time: t });
-    }
-    // Add space between segments
-    charTimeline.push({ char: " ", time: seg.end });
-  }
+    const totalDuration = Math.max(audioDuration, ...segments.map((s) => s.end));
+    const charTimeline = [];
 
-  // Full whisper text (normalized)
-  const whisperFull = normalize(
-    segments.map((s) => s.text).join(" "),
-  );
-
-  // Flatten user lyrics into one normalized string
-  const userFull = normalize(lines.join(" "));
-
-  // Map each user line to a position in the whisper text proportionally
-  const aligned = [];
-  let userCharPos = 0;
-
-  for (const line of lines) {
-    const normalizedLine = normalize(line);
-    if (!normalizedLine) {
-      aligned.push({ text: line, start: 0, end: 0, matched: false });
-      continue;
+    for (const seg of segments) {
+      const chars = seg.text.split("");
+      for (let i = 0; i < chars.length; i++) {
+        const t = seg.start + ((seg.end - seg.start) * i) / Math.max(chars.length, 1);
+        charTimeline.push({ time: t });
+      }
+      charTimeline.push({ time: seg.end });
     }
 
-    // This line's proportion in the total user text
-    const lineStartRatio = userCharPos / Math.max(userFull.length, 1);
-    const lineEndRatio = (userCharPos + normalizedLine.length) / Math.max(userFull.length, 1);
+    const userFull = lines.join(" ").replace(/\s+/g, " ");
+    let userCharPos = 0;
 
-    // Map to whisper character timeline
-    const timelineStart = Math.floor(lineStartRatio * charTimeline.length);
-    const timelineEnd = Math.floor(lineEndRatio * charTimeline.length);
+    return lines.map((text) => {
+      const normalizedLine = text.replace(/\s+/g, " ").trim();
+      const lineStartRatio = userCharPos / Math.max(userFull.length, 1);
+      const lineEndRatio = (userCharPos + normalizedLine.length) / Math.max(userFull.length, 1);
 
-    const startTime = charTimeline[Math.min(timelineStart, charTimeline.length - 1)]?.time ?? 0;
-    const endTime = charTimeline[Math.min(timelineEnd, charTimeline.length - 1)]?.time ?? startTime + 2;
+      const timelineStart = Math.floor(lineStartRatio * charTimeline.length);
+      const timelineEnd = Math.floor(lineEndRatio * charTimeline.length);
 
-    aligned.push({
-      text: line,
-      start: parseFloat(startTime.toFixed(2)),
-      end: parseFloat(endTime.toFixed(2)),
-      matched: true,
+      const startTime = charTimeline[Math.min(timelineStart, charTimeline.length - 1)]?.time ?? 0;
+      const endTime = charTimeline[Math.min(timelineEnd, charTimeline.length - 1)]?.time ?? startTime + 2;
+
+      userCharPos += normalizedLine.length + 1;
+
+      return {
+        text,
+        start: parseFloat(startTime.toFixed(2)),
+        end: parseFloat(endTime.toFixed(2)),
+        matched: true,
+      };
     });
-
-    userCharPos += normalizedLine.length + 1; // +1 for space between lines
   }
 
-  console.log(`Aligned ${aligned.length} lines across ${totalDuration.toFixed(1)}s`);
-  return aligned;
-}
-
-function distributeEvenly(lines, duration) {
-  const gap = duration / (lines.length + 1);
+  // Last fallback: even distribution
+  const gap = audioDuration / (lines.length + 1);
   return lines.map((text, i) => ({
     text,
     start: parseFloat((gap * (i + 1)).toFixed(2)),
