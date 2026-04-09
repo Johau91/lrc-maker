@@ -9,6 +9,7 @@ export async function loadWhisperModel(onProgress) {
     "automatic-speech-recognition",
     "Xenova/whisper-base",
     {
+      device: "wasm",
       progress_callback: (progress) => {
         if (onProgress && progress.status === "progress") {
           onProgress({
